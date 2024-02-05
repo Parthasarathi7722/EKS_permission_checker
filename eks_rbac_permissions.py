@@ -49,10 +49,20 @@ def list_eks_rbac_permissions(cluster_name, region):
 
             permission_level = get_permission_level(attached_policies)
 
+            # Get IAM users and roles attached to the policy
+            policy_users = iam_client.list_entities_for_policy(
+                PolicyArn=f'arn:aws:iam::{cluster_info["cluster"]["account-id"]}:policy/{attached_policies[0]}'
+            )
+
+            users = [user['UserName'] for user in policy_users.get('PolicyUsers', [])]
+            roles = [role['RoleName'] for role in policy_users.get('PolicyRoles', [])]
+
             rbac_permissions.append({
                 'Role': role_arn,
                 'AttachedPolicies': attached_policies,
-                'PermissionLevel': permission_level
+                'PermissionLevel': permission_level,
+                'Users': users,
+                'Roles': roles
             })
 
         return rbac_permissions
@@ -64,7 +74,7 @@ def list_eks_rbac_permissions(cluster_name, region):
 def save_to_csv(data, filename='rbac_permissions.csv'):
     try:
         with open(filename, mode='w', newline='') as file:
-            writer = csv.DictWriter(file, fieldnames=['Role', 'AttachedPolicies', 'PermissionLevel'])
+            writer = csv.DictWriter(file, fieldnames=['Role', 'AttachedPolicies', 'PermissionLevel', 'Users', 'Roles'])
             writer.writeheader()
             for entry in data:
                 writer.writerow(entry)
@@ -97,7 +107,9 @@ def main():
         for permission in rbac_permissions:
             print(f"Role: {permission['Role']}")
             print(f"  Attached Policies: {', '.join(permission['AttachedPolicies'])}")
-            print(f"  Permission Level: {permission['PermissionLevel']}\n---\n")
+            print(f"  Permission Level: {permission['PermissionLevel']}")
+            print(f"  Users: {', '.join(permission['Users'])}")
+            print(f"  Roles: {', '.join(permission['Roles'])}\n---\n")
 
         # Save RBAC information to CSV
         save_to_csv(rbac_permissions)
